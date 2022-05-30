@@ -124,10 +124,13 @@ class Agent:
     actor_network = Model(inputs=[state, advantage, old_prediction], outputs=policy)
 
     if self.dic_agent_conf["OPTIMIZER"] is "Adam":
-      actor_network.compile(optimizer=Adam,(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]), loss=self.proximal_policy_optimization_loss(advantage=advantage, old_prediction=old_prediction,))
-    elif self.dic_agent_conf["OPTIMIZER" is "PMSProp"]:
+      actor_network.compile(optimizer=Adam(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]), loss=self.proximal_policy_optimization_loss(advantage=advantage, old_prediction=old_prediction,))
+    elif self.dic_agent_conf["OPTIMIZER"] is "PMSProp":
       actor_network.compile(optimizer=RMSprop(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]))
-    print("==+ Build Actor Network ===")
+    else:
+      print("No such optimizer for actor network. Instead, we used adam optimizer")
+      actor_network.compile(optimizer=Adam(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]))
+    print("=== Build Actor Network ===")
     actor_network.summary()
 
     time.sleep(1.0)
@@ -148,4 +151,17 @@ class Agent:
     
     critic_network = Model(inputs=state, outputs=q)
 
+    if self.dic_agent_conf["OPTIMIZER"] is "Adam":
+      critic_network.compile(optimizer=Adam(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]), loss=self.dic_agent_conf["CRITIC_LOSS"])
+    elif self.dic_agent_conf["OPTIMIZER"] is "RMSProp":
+      critic_network.compile(optimizer=RMSprop(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]), loss=self.dic_agent_conf["CRITIC_LOSS"])
+    else:
+      print("Not such optimizer for actor network. Instead, we use adam optimizer.")
+      critic_network.compile(optimizer=Adam(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]), loss=self.dic_agent_conf["CRITIC_LOSS"])
+
+    print("=== Build Critic Network ===")
+    critic_network.summary()
+
+    time.sleep(1.0)
+    return critic_network 
     

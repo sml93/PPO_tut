@@ -114,3 +114,38 @@ class Agent:
   def _build_actor_network(self):
     state = Input(shape=self.dic_agent_conf["STATE_DIM"], name="state")
     advantage = Input(shape=(1, ), name="Advantage")
+    old_prediction = Input(shape=(self.n_actions,), name="Old_Prediction")
+
+    shared_hidden = self._shared_network_structure(state)
+    action_dim = self.dic_agent_conf["ACTION_DIM"]
+
+    policy = Dense(action_dim, activation="softmax", name="actor_output_layer")(shared_hidden)
+
+    actor_network = Model(inputs=[state, advantage, old_prediction], outputs=policy)
+
+    if self.dic_agent_conf["OPTIMIZER"] is "Adam":
+      actor_network.compile(optimizer=Adam,(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]), loss=self.proximal_policy_optimization_loss(advantage=advantage, old_prediction=old_prediction,))
+    elif self.dic_agent_conf["OPTIMIZER" is "PMSProp"]:
+      actor_network.compile(optimizer=RMSprop(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]))
+    print("==+ Build Actor Network ===")
+    actor_network.summary()
+
+    time.sleep(1.0)
+    return actor_network
+
+  def update_target_network(self):
+    alpha = self.dic_agent_conf["TARGET_UPDATE_ALPHA"]
+    self.actor_old_network.set_weights(alpha*np.array(self.actor_network.get_weights()) + (1-alpha)*np.array(self.actor_old_network.get_weights()))
+
+  def _build_critic_network(self):
+    state = Input(shape=self.dic_agent_conf["STATE_DIM"], name="state")
+    shared_hidden = self._shared_network_structure(state)
+
+    if self.dic_env_conf["POSITIVE_REWARD"]:
+      q = Dense(1, activation="relu", name="critic_output_layer")(shared_hidden)
+    else:
+      q = Dense(1, name="critic_output_layer")(shared_hidden)
+    
+    critic_network = Model(inputs=state, outputs=q)
+
+    

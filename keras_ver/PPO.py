@@ -73,7 +73,8 @@ class Agent:
 
     for r in self.memory.batch_r[::-1]:
       v = r + self.dic_agent_conf["GAMMA"] * v
-      discounted_r.reverse()
+      discounted_r.append(v)
+    discounted_r.reverse()
 
     batch_s, batch_a, batch_discounted_r = np.vstack(self.memory.batch_s), np.vstack(self.memory.batch_a), np.vstack(discounted_r)
 
@@ -87,12 +88,11 @@ class Agent:
     self.actor_network.fit(x=[batch_s, batch_advantage, batch_old_prediction], y=batch_a_final, verbose=0)
     self.critic_network.fit(x=batch_s, y=batch_discounted_r, epoch=2, verbose=0)
     self.memory.clear()
-    self.update_targe_network()
+    self.update_target_network()
 
   def get_old_prediction(self, s):
     s = np.reshape(s, (-1, self.dic_agent_conf["STATE_DIM"][0]))
-    v = self.critic_network.predict_on_batch(s)
-    return v
+    return self.actor_old_network.predict_on_batch(s)
 
   def store_transition(self, s, a, s_, r, done):
     self.memory.store(s, a, s_, r, done)
@@ -163,5 +163,29 @@ class Agent:
     critic_network.summary()
 
     time.sleep(1.0)
-    return critic_network 
-    
+    return critic_network
+
+  def build_network_from_copy(self, actor_network):
+    network_structure = actor_network.to_json()
+    network_weights = actor_network.get_weights()
+    network = model_from_json(network_structure)
+    network.set_weights(network_weights)
+    network.compile(optimizer=Adam(lr=self.dic_agent_conf["ACTOR_LEARNING_RATE"]), loss="mse")
+    return network
+
+  def _shared_network_structure(self, state_features):
+    dense_d = self.dic_agent_conf["D_DENSE"]
+    hidden1 = Dense(dense_d, activation="relu", name="hidden_shared_1")(state_features)
+    hidden2 = Dense(dense_d, activation="relu", name="hidden_shared_2")(hidden1)
+    return hidden2
+
+  def proximal_policy_optimization_loss(self, advantage, old_prediction):
+    loss_clipping = self.dic_agent_conf["CLIPPING_LOSS_RATIO"]
+    entropy_loss = self.dic_agent_conf["ENTROPY_LOSS_RATIO"]
+
+    def loss(y_true, y_pred):
+      prob = y_true * y_pred
+      old_prob = y_true * old_prediction
+      r = prob / (old_prob + 1e-10)
+      return -K.mean(K.minimum(r*advantage, K.clip(r, min_value=1-loss_clipping, max_value=1+loss_clipping)*advantage) + entropy_loss * (prob * K.log(prob+1e-10)))
+    return loss
